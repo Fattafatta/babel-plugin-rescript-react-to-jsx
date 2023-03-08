@@ -13,7 +13,7 @@ import {transform} from '@babel/core'
 //	return ast
 //}
 
-export default function(converterOptions={ plugins: ['../'] }, parserOptions={}) {
+export default function(name, converterOptions={ plugins: ['../'] }, parserOptions={}) {
 	if (parserOptions.presets)
 		throw new Error(`The parserPlugins should not transform but contain the preset(s) ${parserOptions.presets}`)
 	
@@ -35,7 +35,7 @@ export default function(converterOptions={ plugins: ['../'] }, parserOptions={})
 	}
 	
 	return function convertTo(chai, utils) {
-		chai.Assertion.addMethod('convertTo', function(expectedCode) {
+		chai.Assertion.addMethod(name, function(expectedCode) {
 			const sourceCode = utils.flag(this, 'object')
 			const received = convert(sourceCode)
 			
