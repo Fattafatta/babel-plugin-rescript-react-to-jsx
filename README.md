@@ -22,16 +22,18 @@ yarn add @fattafatta/babel-plugin-rescript-react-to-jsx babel-preset-solid --dev
 
 ## Usage
 
+The plugin supports JSX versions 3 and 4. If no version is specified via the `jsx` option, the plugin will default to `v4`. If you are using the newest version of rescript (>= 10.1), the default settings should be fine.
+
+For older versions of rescript (< 10.1) it is necessary to set the jsx version to `v3`.
+
 ### Via config file
 
 Add this to your `.babelrc`:
 
 ```json
 {
-  "plugins": [ "@fattafatta/babel-plugin-rescript-react-to-jsx" ],
-  "presets": [
-    "solid"
-  ]
+  "plugins": [ ["@fattafatta/babel-plugin-rescript-react-to-jsx", {"jsx": "v4"}] ],
+  "presets": [ "solid" ]
 }
 ```
 
@@ -60,7 +62,7 @@ export default defineConfig({
     createReScriptPlugin(),
     babel({
       babelConfig: {
-        plugins: ["@fattafatta/babel-plugin-rescript-react-to-jsx"],
+        plugins: [["@fattafatta/babel-plugin-rescript-react-to-jsx", {jsx: "v4"}]],
         presets: ["solid"],
       },
     }),
@@ -76,6 +78,8 @@ Make sure to use the correct file extension when transforming files. ReScript fi
 ```sh
 babel --no-babelrc --plugins @fattafatta/babel-plugin-rescript-react-to-jsx script.bs.js > script.jsx
 ```
+
+NOTE: Babel CLI does not support passing options to plugins. Therefore the cli will always run with JSX v3 (the default).
 
 ## Acknowledgements
 
