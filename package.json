@@ -29,16 +29,16 @@
     "test": "mocha --require @babel/register test"
   },
   "devDependencies": {
-    "@babel/cli": "^7.17.10",
-    "@babel/core": "^7.18.5",
-    "@babel/preset-env": "^7.18.2",
-    "@babel/register": "^7.17.7",
-    "@types/babel__core": "^7.1.19",
-    "chai": "^4.3.6",
-    "mocha": "^10.0.0"
+    "@babel/cli": "^7.21.0",
+    "@babel/core": "^7.21.0",
+    "@babel/preset-env": "^7.20.2",
+    "@babel/register": "^7.21.0",
+    "@types/babel__core": "^7.20.0",
+    "chai": "^4.3.7",
+    "mocha": "^10.2.0"
   },
   "dependencies": {
-    "@babel/plugin-syntax-jsx": "^7.17.12",
-    "core-js": "^3.23.1"
+    "@babel/plugin-syntax-jsx": "^7.18.6",
+    "core-js": "^3.29.0"
   }
 }
