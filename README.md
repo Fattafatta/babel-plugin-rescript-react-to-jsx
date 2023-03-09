@@ -22,9 +22,16 @@ yarn add @fattafatta/babel-plugin-rescript-react-to-jsx babel-preset-solid --dev
 
 ## Usage
 
-The plugin supports JSX versions 3 and 4. If no version is specified via the `jsx` option, the plugin will default to `v4`. If you are using the newest version of rescript (>= 10.1), the default settings should be fine.
+The plugin supports JSX versions 3 and 4. If no version is specified via the `jsx` option, the plugin will default to `v3`. This is analog to the rescript compiler which defaults to "classic" mode.
 
-For older versions of rescript (< 10.1) it is necessary to set the jsx version to `v3`.
+Short overview of compiler options in `bsconfig.json` and corresponding settings for this plugin:
+
+| rescript compiler settings | babel plugin options |
+| -------- | -------- |
+| `"reason": { "react-jsx": 3 }` | `{"jsx": "v3"}` |
+| `"jsx": { "version": 4 }` | `{"jsx": "v3"}` |
+| `"jsx": { "version": 4, "mode": "classic" }` | `{"jsx": "v3"}` |
+| `"jsx": { "version": 4, "mode": "automatic" }` | `{"jsx": "v4"}` |
 
 ### Via config file
 
