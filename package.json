@@ -1,6 +1,6 @@
 {
   "name": "@fattafatta/babel-plugin-rescript-react-to-jsx",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Transforms ReScript React.createElement calls back to JSX syntax",
   "author": "Fattafatta",
   "license": "GPL-3.0",
