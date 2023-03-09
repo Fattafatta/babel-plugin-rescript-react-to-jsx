@@ -12,8 +12,10 @@ chai.use(
 describe("createElement-to-JSX", () => {
   it("should support all ReScript function calls", () => {
     expect('React.createElement("h1")').to.convertToV3("<h1 />;");
+    expect('ReactDOM.createElement("h1")').to.convertToV3("<h1 />;");
     expect('ReactDOMRe.createElement("h1")').to.convertToV3("<h1 />;");
     expect('ReactDOMRe.createDOMElementVariadic("h1")').to.convertToV3("<h1 />;");
+    expect('ReactDOM.createDOMElementVariadic("h1")').to.convertToV3("<h1 />;");
     expect('React.createElementVariadic("h1")').to.convertToV3("<h1 />;");
   });
   it("should convert 1-argument calls", () => {
