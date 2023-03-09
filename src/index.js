@@ -89,9 +89,10 @@ export default function ({ types: t }) {
     return (
       t.isMemberExpression(node) &&
       (t.isIdentifier(node.object, { name: "JsxRuntime" }) ||
-      t.isIdentifier(node.object, { name: "ReasonReact" }) ||
+        t.isIdentifier(node.object, { name: "ReasonReact" }) ||
         t.isIdentifier(node.object, { name: "React" })) &&
-      t.isIdentifier(node.property, { name: "Fragment" })
+      (t.isIdentifier(node.property, { name: "Fragment" }) ||
+        t.isIdentifier(node.property, { name: "jsxFragment" }))
     );
   };
 
@@ -146,6 +147,7 @@ export default function ({ types: t }) {
     t.isCallExpression(node) &&
     t.isMemberExpression(node.callee) &&
     (t.isIdentifier(node.callee.object, { name: "React" }) ||
+      t.isIdentifier(node.callee.object, { name: "ReactDOM" }) ||
       t.isIdentifier(node.callee.object, { name: "ReactDOMRe" })) &&
     (t.isIdentifier(node.callee.property, { name: "createElement" }) ||
       t.isIdentifier(node.callee.property, { name: "createElementVariadic" }) ||
@@ -210,7 +212,10 @@ export default function ({ types: t }) {
   const isJsxRuntimeJsx = (node) =>
     t.isCallExpression(node) &&
     t.isMemberExpression(node.callee) &&
-    t.isIdentifier(node.callee.object, { name: "JsxRuntime" }) &&
+    (t.isIdentifier(node.callee.object, { name: "JsxRuntime" }) ||
+      t.isIdentifier(node.callee.object, { name: "React" }) ||
+      t.isIdentifier(node.callee.object, { name: "ReactDOM" }) ||
+      t.isIdentifier(node.callee.object, { name: "ReactDOMRe" })) &&
     (t.isIdentifier(node.callee.property, { name: "jsx" }) ||
       t.isIdentifier(node.callee.property, { name: "jsxs" }) ||
       t.isIdentifier(node.callee.property, { name: "jsxDEV" })) &&
@@ -247,7 +252,7 @@ export default function ({ types: t }) {
     const props = node.properties.filter(
       (p) => !t.isIdentifier(p.key, { name: "children" })
     );
-    return {...node, ...{properties: props}}
+    return { ...node, ...{ properties: props } };
   }
 
   return {
@@ -257,9 +262,9 @@ export default function ({ types: t }) {
         const jsxVersion = state.opts.jsx;
 
         const node =
-          jsxVersion === "v3"
-            ? getJSXNodeV3(path.node)
-            : getJSXNodeV4(path.node);
+          jsxVersion === "v4"
+            ? getJSXNodeV4(path.node)
+            : getJSXNodeV3(path.node);
         if (node === null) return null;
         if (node.length && node.length > 0) {
           path.replaceWithMultiple(node);
