@@ -1,6 +1,6 @@
 /** Visitor factory for babel, converting React.createElement(...) to <jsx ...>...</jsx>
  *
- * What we want to handle here is this CallExpression:
+ * What we want to handle here is this CallExpression v3:
  *
  *     React.createElement(
  *       type: StringLiteral|Identifier|MemberExpression,
@@ -8,8 +8,21 @@
  *       [...children: StringLiteral|Expression]
  *     )
  *
+ * Or v4 (children are included in props):
+ *
+ *     JsxRuntime.jsx(
+ *       type: StringLiteral|Identifier|MemberExpression,
+ *       [props: ObjectExpression|Expression],
+ *     )
+ *
  * Any of those arguments might also be missing (undefined) and/or invalid. */
-export default function ({ types: t }) {
+ export default function (babel) {
+  /**
+   * This enables autocompletion in vs code
+   * @type {{types: import("@babel/types")}}
+   */
+  const { types: t } = babel;
+
   function getJSXIdentifier(node) {
     //TODO: JSXNamespacedName
     if (t.isIdentifier(node)) return t.jSXIdentifier(node.name);
@@ -88,16 +101,19 @@ export default function ({ types: t }) {
   const isReactFragment = (node) => {
     return (
       t.isMemberExpression(node) &&
-      (t.isIdentifier(node.object, { name: "JsxRuntime" }) ||
+      (
+        t.isIdentifier(node.object, { name: "JsxRuntime" }) ||
         t.isIdentifier(node.object, { name: "ReasonReact" }) ||
         t.isIdentifier(node.object, { name: "React" })) &&
-      (t.isIdentifier(node.property, { name: "Fragment" }) ||
+      (
+        t.isIdentifier(node.property, { name: "Fragment" }) ||
+        t.isIdentifier(node.property, { name: "fragment" }) ||
         t.isIdentifier(node.property, { name: "jsxFragment" }))
     );
   };
 
   /** Creates a JSX Fragment with given children */
-  const jSXFragment = (children) => {
+  const createJsxFragment = (children) => {
     return t.jSXFragment(
       t.jSXOpeningFragment(),
       t.jSXClosingFragment(),
@@ -106,7 +122,7 @@ export default function ({ types: t }) {
   };
 
   /** Creates a JSX Element */
-  const jSXElement = (name, props, children) => {
+  const createJsxElement = (name, props, children) => {
     // self-closing tag if no children
     const selfClosing = children.length === 0;
     const startTag = t.jSXOpeningElement(name, props, selfClosing);
@@ -115,46 +131,50 @@ export default function ({ types: t }) {
     return t.jSXElement(startTag, endTag, children, selfClosing);
   };
 
-  /** Get a JSXElement from a CallExpression
-   * Returns null if this impossible */
-  function getJSXNodeV3(node) {
-    // only transform "React.createElement" Expressions
-    if (!isReactCreateElement(node)) return null;
-
-    //nameNode and propsNode may be undefined, getJSX* need to handle that
-    const [nameNode, propsNode, ...childNodes] = node.arguments;
-
-    let name = getJSXName(nameNode);
-    if (name === null) return null; //name is required
-
-    const children = isEmptyChildren(childNodes)
-      ? []
-      : getJSXChildrenV3(childNodes);
-    if (children === null) return null; //no children → [], invalid → null
-
-    if (isReactFragment(nameNode)) {
-      return jSXFragment(children);
+  function getJSXChild(node) {
+    if (t.isStringLiteral(node)) {
+      // Solidjs reads from node.extra.raw, but jSXText doesn't create it. So we do it by hand.
+      return { ...t.jSXText(node.value), extra: { raw: node.value } };
     }
-
-    const props = getJSXProps(propsNode);
-    if (props === null) return null; //no props → [], invalid → null
-
-    return jSXElement(name, props, children);
+    if (getNodeJsxVersion(node)) return getJSXNode(node);
+    if (t.isExpression(node)) return t.jSXExpressionContainer(node);
+    return null;
   }
 
-  /** tests if a node is a CallExpression with callee “React.createElement” */
-  const isReactCreateElement = (node) =>
-    t.isCallExpression(node) &&
-    t.isMemberExpression(node.callee) &&
-    (t.isIdentifier(node.callee.object, { name: "React" }) ||
-      t.isIdentifier(node.callee.object, { name: "ReactDOM" }) ||
-      t.isIdentifier(node.callee.object, { name: "ReactDOMRe" })) &&
-    (t.isIdentifier(node.callee.property, { name: "createElement" }) ||
-      t.isIdentifier(node.callee.property, { name: "createElementVariadic" }) ||
-      t.isIdentifier(node.callee.property, {
-        name: "createDOMElementVariadic",
-      })) &&
-    !node.callee.computed;
+  /** Tests if a node is a CallExpression with a callee that matches a Jsx.Element
+   * like “React.createElement” or "JsxRuntime.jsx".
+   * @param {import("@babel/traverse").Node} node
+   */
+  const getNodeJsxVersion = (node) => {
+    if (
+      t.isCallExpression(node) &&
+      t.isMemberExpression(node.callee) &&
+      (
+        t.isIdentifier(node.callee.object, { name: "JsxRuntime" }) ||
+        t.isIdentifier(node.callee.object, { name: "React" }) ||
+        t.isIdentifier(node.callee.object, { name: "ReactDOM" }) ||
+        t.isIdentifier(node.callee.object, { name: "ReactDOMRe" })
+      )
+    ) {
+      if (
+        t.isIdentifier(node.callee.property, { name: "createElement" }) ||
+        t.isIdentifier(node.callee.property, { name: "createElementVariadic" }) ||
+        t.isIdentifier(node.callee.property, {
+          name: "createDOMElementVariadic",
+        })
+      ) {
+        return "v3"
+      }  
+      if (
+        t.isIdentifier(node.callee.property, { name: "jsx" }) ||
+        t.isIdentifier(node.callee.property, { name: "jsxs" }) ||
+        t.isIdentifier(node.callee.property, { name: "jsxDEV" })
+      ) {
+        return "v4"
+      } 
+    }
+    return null
+  }
 
   /** tests if an array of nodes only contains empty ArrayExpressions */
   const isEmptyChildren = (children) => {
@@ -166,71 +186,11 @@ export default function ({ types: t }) {
   function getJSXChildrenV3(nodes) {
     const children = nodes
       .filter((node) => !isNullLikeNode(node))
-      .map(getJSXChildV3);
+      .map(getJSXChild);
     if (children.some((child) => child == null)) return null;
     return children;
   }
-
-  function getJSXChildV3(node) {
-    if (t.isStringLiteral(node)) {
-      // Solidjs reads from node.extra.raw, but jSXText doesn't create it. So we do it by hand.
-      return { ...t.jSXText(node.value), extra: { raw: node.value } };
-    }
-    if (isReactCreateElement(node)) return getJSXNodeV3(node);
-    if (t.isExpression(node)) return t.jSXExpressionContainer(node);
-    return null;
-  }
-
-  /** Start of functions specific for transformation jsx v4 */
-  function getJSXNodeV4(node) {
-    // only transform "React.createElement" Expressions
-    if (!isJsxRuntimeJsx(node)) return null;
-
-    //nameNode and propsNode may be undefined, getJSX* need to handle that
-    const [nameNode, propsNode] = node.arguments;
-
-    let name = getJSXName(nameNode);
-    if (name === null) return null; //name is required
-
-    const children = hasJSXChildrenV4(propsNode)
-      ? getJSXChildrenV4(propsNode)
-      : [];
-
-    if (isReactFragment(nameNode)) {
-      return jSXFragment(children);
-    }
-
-    const props = hasJSXChildrenV4(propsNode)
-      ? getJSXProps(removeChildrenFromPropsV4(propsNode))
-      : getJSXProps(propsNode);
-    if (props === null) return null; //no props → [], invalid → null
-
-    return jSXElement(name, props, children);
-  }
-
-  /** tests if a node is a CallExpression with callee JsxRuntime.jsx */
-  const isJsxRuntimeJsx = (node) =>
-    t.isCallExpression(node) &&
-    t.isMemberExpression(node.callee) &&
-    (t.isIdentifier(node.callee.object, { name: "JsxRuntime" }) ||
-      t.isIdentifier(node.callee.object, { name: "React" }) ||
-      t.isIdentifier(node.callee.object, { name: "ReactDOM" }) ||
-      t.isIdentifier(node.callee.object, { name: "ReactDOMRe" })) &&
-    (t.isIdentifier(node.callee.property, { name: "jsx" }) ||
-      t.isIdentifier(node.callee.property, { name: "jsxs" }) ||
-      t.isIdentifier(node.callee.property, { name: "jsxDEV" })) &&
-    !node.callee.computed;
-
-  function getJSXChildV4(node) {
-    if (t.isStringLiteral(node)) {
-      // Solidjs reads from node.extra.raw, but jSXText doesn't create it. So we do it by hand.
-      return { ...t.jSXText(node.value), extra: { raw: node.value } };
-    }
-    if (isJsxRuntimeJsx(node)) return getJSXNodeV4(node);
-    if (t.isExpression(node)) return t.jSXExpressionContainer(node);
-    return null;
-  }
-
+  
   function hasJSXChildrenV4(node) {
     return (
       t.isObjectExpression(node) &&
@@ -245,7 +205,7 @@ export default function ({ types: t }) {
     const children = t.isArrayExpression(childrenProp)
       ? childrenProp.elements
       : [childrenProp];
-    return children.map(getJSXChildV4);
+    return children.map(getJSXChild);
   }
 
   function removeChildrenFromPropsV4(node) {
@@ -255,16 +215,63 @@ export default function ({ types: t }) {
     return { ...node, ...{ properties: props } };
   }
 
+  /** Get a JSXElement from a CallExpression
+   * Returns null if this impossible 
+   * @param {import("@babel/traverse").Node} node
+   */
+  function getJSXNode(node) {
+    // only transform "React.createElement" or "JsxRuntime.jsx" Expressions
+    const jsxVersion = getNodeJsxVersion(node)
+    if (!jsxVersion) return null;
+
+    // nameNode and propsNode may be undefined, getJSX* need to handle that
+    const [nameNode, propsNode, ...childNodes] = node.arguments;
+
+    let name = getJSXName(nameNode);
+    if (name === null) return null; //name is required
+
+    if (jsxVersion === "v3") {
+      const children = isEmptyChildren(childNodes)
+        ? []
+        : getJSXChildrenV3(childNodes);
+      if (children === null) return null; //no children → [], invalid → null
+
+      if (isReactFragment(nameNode)) {
+        return createJsxFragment(children);
+      }
+
+      const props = getJSXProps(propsNode);
+      if (props === null) return null; //no props → [], invalid → null
+
+      return createJsxElement(name, props, children);
+    } else if (jsxVersion === "v4") {
+      const children = hasJSXChildrenV4(propsNode)
+        ? getJSXChildrenV4(propsNode)
+        : [];
+
+      if (isReactFragment(nameNode)) {
+        return createJsxFragment(children);
+      }
+
+      const props = hasJSXChildrenV4(propsNode)
+        ? getJSXProps(removeChildrenFromPropsV4(propsNode))
+        : getJSXProps(propsNode);
+      if (props === null) return null; //no props → [], invalid → null
+
+      return createJsxElement(name, props, children);
+    }
+  }
+
   return {
     name: "rescript-transform-to-jsx",
     visitor: {
-      CallExpression(path, state) {
-        const jsxVersion = state.opts.jsx;
-
-        const node =
-          jsxVersion === "v4"
-            ? getJSXNodeV4(path.node)
-            : getJSXNodeV3(path.node);
+      /**
+       * We are interested in Jsx components
+       * @param {import("@babel/traverse").NodePath} path
+       * @param {import("@babel/traverse").TraversalContext} state
+       */
+      CallExpression(path, _) {
+        const node = getJSXNode(path.node)
         if (node === null) return null;
         if (node.length && node.length > 0) {
           path.replaceWithMultiple(node);

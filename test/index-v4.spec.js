@@ -3,8 +3,8 @@ import convertTo from "./chai-convert-to";
 
 chai.use(
   convertTo(
-    'convertTo',
-    { plugins: [[require.resolve("../"), {jsx: "v4"}], "@babel/syntax-object-rest-spread"] },
+    "convertTo",
+    { plugins: [require.resolve("../"), "@babel/syntax-object-rest-spread"] },
     { plugins: ["@babel/syntax-jsx", "@babel/syntax-object-rest-spread"] }
   )
 );
@@ -74,5 +74,12 @@ describe("JsxRuntime.jsx-to-JSX", () => {
     expect(
       'JsxRuntime.jsx("h1", {children: foo ? JsxRuntime.jsx("p") : null})'
     ).to.convertTo("<h1>{foo ? <p /> : null}</h1>;");
+  });
+
+  it("should handle react fragments", () => {
+    expect("React.createElement(React.Fragment, null)").to.convertTo("<></>;");
+    expect("React.createElement(ReasonReact.fragment, null)").to.convertTo("<></>;");
+    expect("React.createElement(JsxRuntime.Fragment, null)").to.convertTo("<></>;");
+    expect("React.createElement(JsxRuntime.jsxFragment, null)").to.convertTo("<></>;");
   });
 });
